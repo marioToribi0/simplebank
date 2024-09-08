@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 )
 
 // Stores provides all functions to execute db queries and transactions
@@ -11,6 +10,8 @@ type Store struct {
 	*Queries
 	db *sql.DB
 }
+
+var txKey = struct{}{}
 
 // NewStore creates a new Store
 func NewStore(db *sql.DB) *Store {
@@ -32,7 +33,6 @@ func (store *Store) execTx(ctx context.Context, fn func(*Queries) error) error {
 
 	if err != nil {
 		if rbError := tx.Rollback(); rbError != nil {
-			return fmt.Errorf("tx err: %v, rb err: %v", err, rbError)
 		}
 		return err
 	}
@@ -83,24 +83,28 @@ func (store *Store) TransferTx(ctx context.Context, arg CreateTransferParams) (T
 
 		// TODO: locking
 		// Get actual amounts
-		// account1, err := q.GetAccount(context.Background(), arg.FromAccountID)
-		// if err != nil {
-		// 	return err
-		// }
-		// account2, err := q.GetAccount(context.Background(), arg.ToAccountID)
-		// if err != nil {
-		// 	return err
-		// }
-
-		// // Update accounts
-		// q.UpdateAccounts(context.Background(), UpdateAccountsParams{
-		// 	ID:      account1.ID,
-		// 	Balance: account1.Balance - arg.Amount,
-		// })
-		// q.UpdateAccounts(context.Background(), UpdateAccountsParams{
-		// 	ID:      account2.ID,
-		// 	Balance: account2.Balance + arg.Amount,
-		// })
+		account1, err := q.GetAccountForUpdate(context.Background(), arg.FromAccountID)
+		if err != nil {
+			return err
+		}
+		result.FromAccount, err = q.UpdateAccounts(context.Background(), UpdateAccountsParams{
+			ID:      account1.ID,
+			Balance: account1.Balance - arg.Amount,
+		})
+		if err != nil {
+			return err
+		}
+		account2, err := q.GetAccountForUpdate(context.Background(), arg.ToAccountID)
+		if err != nil {
+			return err
+		}
+		result.ToAccount, err = q.UpdateAccounts(context.Background(), UpdateAccountsParams{
+			ID:      account2.ID,
+			Balance: account2.Balance + arg.Amount,
+		})
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})

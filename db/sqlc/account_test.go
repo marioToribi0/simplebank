@@ -56,7 +56,7 @@ func TestUpdateAccounts(t *testing.T) {
 		Balance: util.RandomMoney(),
 	}
 
-	err := testQueries.UpdateAccounts(context.Background(), arg)
+	_, err := testQueries.UpdateAccounts(context.Background(), arg)
 	require.NoError(t, err)
 
 	account2, err := testQueries.GetAccount(context.Background(), arg.ID)
